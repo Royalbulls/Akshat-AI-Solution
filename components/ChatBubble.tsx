@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, Role } from '../types';
-import { UserIcon, BotIcon, ThumbsUpIcon, ThumbsDownIcon, VideoCameraIcon, ClipboardIcon, DownloadIcon, FileTxtIcon, FileDocIcon, FileCsvIcon, SpeakerWaveIcon, SpeakerXMarkIcon, PlayIcon, PauseIcon, DocumentTextIcon, InfoIcon } from './Icons';
+import { UserIcon, BotIcon, ThumbsUpIcon, ThumbsDownIcon, VideoCameraIcon, ClipboardIcon, DownloadIcon, FileTxtIcon, FileDocIcon, FileCsvIcon, SpeakerWaveIcon, SpeakerXMarkIcon, PlayIcon, PauseIcon, InfoIcon, ImageIcon, ShareIcon } from './Icons';
 
 interface ChatBubbleProps {
   message: Message;
@@ -26,11 +26,8 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSelectApiKey, onFeed
   const [isDownloadMenuOpen, setIsDownloadMenuOpen] = useState(false);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [isMuted, setIsMuted] = useState(true);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
 
   const isUser = message.role === Role.USER;
@@ -84,6 +81,52 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSelectApiKey, onFeed
       onFeedback(message.id, type);
       setShowFeedbackToast(true);
       setTimeout(() => setShowFeedbackToast(false), 2500);
+  };
+
+  const handleShare = async () => {
+      try {
+          const shareData: any = {
+              title: 'Akshat AI Output',
+              text: message.text
+          };
+
+          let fileToShare: File | null = null;
+
+          if (message.imageUrl) {
+              const res = await fetch(message.imageUrl);
+              const blob = await res.blob();
+              fileToShare = new File([blob], "generated-image.png", { type: blob.type });
+          } else if (message.videoUrl && message.videoState === 'done') {
+               const res = await fetch(message.videoUrl);
+               const blob = await res.blob();
+               fileToShare = new File([blob], "generated-video.mp4", { type: 'video/mp4' });
+          }
+
+          if (fileToShare) {
+              shareData.files = [fileToShare];
+          }
+
+          if (navigator.canShare && navigator.canShare(shareData)) {
+              await navigator.share(shareData);
+          } else {
+              // Fallback
+              if (fileToShare) {
+                  const url = URL.createObjectURL(fileToShare);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = fileToShare.name;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  alert("Sharing files not supported on this device. Content downloaded.");
+              } else {
+                  // Fallback for text: Open Twitter intent
+                  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message.text.substring(0, 200))}...`;
+                  window.open(twitterUrl, '_blank');
+              }
+          }
+      } catch (error) {
+          console.error("Sharing failed", error);
+      }
   };
 
   const handleDownload = (format: 'txt' | 'doc' | 'csv') => {
@@ -176,30 +219,6 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSelectApiKey, onFeed
             }
         }
     };
-    
-    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newVolume = parseFloat(e.target.value);
-        if (videoRef.current) {
-            videoRef.current.volume = newVolume;
-            videoRef.current.muted = newVolume === 0;
-            setIsMuted(newVolume === 0);
-        }
-        setVolume(newVolume);
-    };
-
-    const toggleMute = () => {
-        if (videoRef.current) {
-            const currentlyMuted = !videoRef.current.muted;
-            videoRef.current.muted = currentlyMuted;
-            setIsMuted(currentlyMuted);
-            // If unmuting and volume was 0, set to a sensible default
-            if (!currentlyMuted && videoRef.current.volume === 0) {
-                const defaultVolume = 0.5;
-                videoRef.current.volume = defaultVolume;
-                setVolume(defaultVolume);
-            }
-        }
-    };
 
     const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newTime = parseFloat(e.target.value);
@@ -230,252 +249,176 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onSelectApiKey, onFeed
   return (
     <div className={`flex items-start gap-3 my-4 ${wrapperClasses} animate-bubble-pop-in`}>
       <div className={`flex-shrink-0 ${isUser ? 'order-2' : 'order-1'}`}>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isUser ? 'bg-gray-700' : isError ? 'bg-red-900/30' : 'bg-gray-800'}`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700`}>
           {icon}
         </div>
       </div>
-      <div className={`max-w-xs md:max-w-md lg:max-w-2xl ${isUser ? 'order-1' : 'order-2'}`}>
-        <div className="relative">
-            {showCopyMessage && (
-                <div 
-                    className={`absolute z-10 -top-8 px-2 py-1 text-xs text-white bg-gray-600 rounded-md transition-opacity duration-300 ${isUser ? 'right-0' : 'left-0'}`}
-                    role="alert"
-                    aria-live="polite"
-                >
-                    Copied!
+      
+      <div className={`flex flex-col gap-1 max-w-xs md:max-w-md lg:max-w-2xl ${isUser ? 'items-end' : 'items-start'}`}>
+        <div className={`px-4 py-3 rounded-2xl ${bubbleClasses} shadow-md text-white relative group`}>
+            
+            {/* Image */}
+            {message.imageUrl && (
+                <div className="mb-3 rounded-lg overflow-hidden border border-gray-600">
+                    <img src={message.imageUrl} alt="Generated or uploaded" className="w-full h-auto" />
                 </div>
             )}
-            {showFeedbackToast && (
-                <div 
-                    className="absolute z-10 -top-10 left-0 right-0 mx-auto w-max px-3 py-1.5 text-xs font-medium text-green-100 bg-green-600/90 rounded-full shadow-lg animate-fade-in-slide-up"
-                    role="status"
-                >
-                    Thanks for the feedback!
-                </div>
-            )}
-            <div
-              className={`px-4 py-3 rounded-2xl text-white shadow-md ${bubbleClasses}`}
-              role="region"
-              aria-label={isError ? "Error message" : "Chat message"}
-            >
-              {message.fileName && (
-                <div className="flex items-center gap-3 p-2 mb-3 bg-black/20 rounded-lg border border-white/10">
-                    <div className="p-2 bg-amber-600/30 rounded-md flex-shrink-0">
-                        <DocumentTextIcon className="w-6 h-6 text-amber-400" />
+
+            {/* Video */}
+            {message.videoUrl && message.videoState === 'done' && (
+                <div className="mb-3 rounded-lg overflow-hidden border border-gray-600 relative group/video">
+                    <video 
+                        ref={videoRef}
+                        src={message.videoUrl}
+                        className="w-full h-auto"
+                        onTimeUpdate={handleTimeUpdate}
+                        onLoadedMetadata={handleLoadedMetadata}
+                        onClick={togglePlayPause}
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover/video:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 mb-1">
+                            <button onClick={togglePlayPause} className="text-white hover:text-amber-400">
+                                {videoRef.current?.paused ? <PlayIcon className="w-4 h-4" /> : <PauseIcon className="w-4 h-4" />}
+                            </button>
+                            <input 
+                                type="range" 
+                                min="0" 
+                                max={duration} 
+                                value={progress} 
+                                onChange={handleProgressChange} 
+                                className="flex-grow h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                            />
+                            <span className="text-[10px] font-mono text-gray-300">{formatTime(progress)} / {formatTime(duration)}</span>
+                        </div>
                     </div>
-                    <div className="min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{message.fileName}</p>
+                </div>
+            )}
+
+            {/* Video Generating */}
+            {message.videoState === 'generating' && (
+                <div className="mb-3 bg-gray-800 rounded-lg p-4 border border-gray-600 flex flex-col items-center text-center gap-3">
+                    {message.placeholderImageUrl ? (
+                        <div className="w-full h-32 mb-2 overflow-hidden rounded-md opacity-50">
+                            <img src={message.placeholderImageUrl} className="w-full h-full object-cover" />
+                        </div>
+                    ) : (
+                        <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center animate-pulse">
+                            <VideoCameraIcon className="w-6 h-6 text-gray-400" />
+                        </div>
+                    )}
+                    <div>
+                        <div className="w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p className="text-sm font-bold text-amber-400 animate-pulse">{loadingMessages[loadingMsgIndex]}</p>
+                    </div>
+                </div>
+            )}
+
+            {/* File Attachment */}
+            {message.fileName && (
+                <div className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-600 mb-2">
+                    <div className="p-2 bg-gray-800 rounded">
+                        {message.fileType?.includes('image') ? <ImageIcon className="w-5 h-5 text-purple-400" /> :
+                         message.fileType?.includes('pdf') ? <FileDocIcon className="w-5 h-5 text-red-400" /> :
+                         message.fileType?.includes('csv') ? <FileCsvIcon className="w-5 h-5 text-green-400" /> :
+                         <FileTxtIcon className="w-5 h-5 text-blue-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{message.fileName}</p>
                         <p className="text-xs text-gray-400 uppercase">{message.fileType?.split('/')[1] || 'FILE'}</p>
                     </div>
                 </div>
-              )}
+            )}
 
-              {message.imageUrl && !isUser && (
-                <div className="relative group mt-2 mb-2">
-                    <img src={message.imageUrl} alt={message.text || 'Generated image'} className="max-w-full h-auto rounded-lg" />
-                    <a 
-                        href={message.imageUrl} 
-                        download={`akshat-image-${message.id}.png`}
-                        className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Download image"
-                        title="Download Image"
+            {/* Audio Message (Input) */}
+            {message.audioUrl && (
+                <div className="flex items-center gap-2 mb-2 bg-gray-900/30 p-2 rounded-full border border-gray-600/50">
+                    <audio src={message.audioUrl} controls className="h-8 w-64" />
+                </div>
+            )}
+
+            {/* Text Content */}
+            <div className="prose prose-invert max-w-none text-sm md:text-base break-words whitespace-pre-wrap leading-relaxed">
+                {message.text}
+            </div>
+
+            {/* Needs API Key Warning */}
+            {message.needsApiKey && (
+                <div className="mt-3 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                    <p className="text-sm text-red-200 mb-2">This feature requires a paid API key.</p>
+                    <button 
+                        onClick={onSelectApiKey}
+                        className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-500 transition-colors"
                     >
-                        <DownloadIcon className="w-5 h-5" />
-                    </a>
-                </div>
-              )}
-
-              {message.text && <p className={`text-base break-words whitespace-pre-wrap ${isError ? 'text-red-200' : ''}`}>{message.text}</p>}
-
-              {message.imageUrl && isUser && (
-                <div className="mt-2">
-                    <img src={message.imageUrl} alt={message.text || 'User uploaded image'} className="max-w-full h-auto rounded-lg" />
-                </div>
-              )}
-
-              {message.audioUrl && (
-                <div className="mt-1">
-                  <audio src={message.audioUrl} controls className="w-full h-10" />
-                </div>
-              )}
-              
-              {message.videoState === 'generating' && (
-                  <div className="relative mt-2 aspect-video w-full bg-gray-800 rounded-lg overflow-hidden">
-                      {message.placeholderImageUrl && (
-                          <img 
-                              src={message.placeholderImageUrl} 
-                              alt="Video generation source" 
-                              className="w-full h-full object-cover opacity-50"
-                          />
-                      )}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                          {!message.placeholderImageUrl && (
-                              <VideoCameraIcon className="w-12 h-12 text-gray-500" />
-                          )}
-                          <div className="flex flex-col items-center gap-2 p-4 bg-black/60 rounded-xl backdrop-blur-sm">
-                              <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin"></div>
-                              <p className="text-sm text-white font-semibold text-center animate-pulse">
-                                {loadingMessages[loadingMsgIndex]}
-                              </p>
-                          </div>
-                      </div>
-                  </div>
-              )}
-              {message.videoUrl && (
-                <div className="mt-2">
-                  <video
-                    ref={videoRef}
-                    src={message.videoUrl}
-                    autoPlay
-                    loop
-                    muted={isMuted}
-                    playsInline
-                    className="max-w-full h-auto rounded-t-lg bg-black cursor-pointer"
-                    onClick={togglePlayPause}
-                    onTimeUpdate={handleTimeUpdate}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onVolumeChange={() => {
-                        if (videoRef.current) {
-                            setVolume(videoRef.current.volume);
-                            setIsMuted(videoRef.current.muted || videoRef.current.volume === 0);
-                        }
-                    }}
-                  />
-                  <div className="bg-gray-800/80 backdrop-blur-sm p-2 flex items-center gap-2 rounded-b-lg text-white">
-                    <button onClick={togglePlayPause} className="p-2 rounded-full hover:bg-white/10 transition-colors" aria-label={isPlaying ? 'Pause' : 'Play'}>
-                      {isPlaying ? <PauseIcon className="w-5 h-5" /> : <PlayIcon className="w-5 h-5" />}
+                        Select API Key
                     </button>
-                    <div className="text-xs font-mono w-10 text-center">{formatTime(progress)}</div>
-                    <input
-                      type="range"
-                      min="0"
-                      max={duration || 0}
-                      value={progress}
-                      onChange={handleProgressChange}
-                      className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                      aria-label="Video progress bar"
-                    />
-                    <div className="text-xs font-mono w-10 text-center">{formatTime(duration)}</div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={toggleMute} className="p-2 rounded-full hover:bg-white/10 transition-colors" aria-label={isMuted ? 'Unmute' : 'Mute'}>
-                        {isMuted || volume === 0 ? <SpeakerXMarkIcon className="w-5 h-5" /> : <SpeakerWaveIcon className="w-5 h-5" />}
-                      </button>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.05"
-                        value={isMuted ? 0 : volume}
-                        onChange={handleVolumeChange}
-                        className="w-20 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                        aria-label="Volume control"
-                      />
+                </div>
+            )}
+
+            {/* Sources */}
+            {message.sources && message.sources.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-600/50">
+                    <p className="text-xs font-bold text-gray-400 mb-1.5">Sources:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {message.sources.map((source, idx) => (
+                            <a 
+                                key={idx} 
+                                href={source.uri} 
+                                target="_blank" 
+                                rel="noreferrer"
+                                className="px-2 py-1 bg-gray-800/50 hover:bg-gray-800 rounded text-xs text-blue-300 truncate max-w-[150px] border border-gray-600 hover:border-blue-400 transition-colors"
+                            >
+                                {source.title || source.uri}
+                            </a>
+                        ))}
                     </div>
-                    <a
-                      href={message.videoUrl}
-                      download={`akshat-video-${message.id}.mp4`}
-                      className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                      aria-label="Download video"
-                      title="Download Video"
-                    >
-                      <DownloadIcon className="w-5 h-5" />
-                    </a>
-                  </div>
                 </div>
-              )}
+            )}
 
-              {message.needsApiKey && (
-                  <div className="mt-3">
-                      <button onClick={onSelectApiKey} className="px-4 py-2 text-sm bg-amber-600 text-white rounded-md hover:bg-amber-500 transition-colors">
-                          Select API Key
-                      </button>
-                      <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 block mt-2 hover:underline">
-                          Billing Information
-                      </a>
-                  </div>
-              )}
+            {/* Action Bar (Model messages only) */}
+            {!isUser && !isError && (
+                <div className="absolute -bottom-9 left-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button onClick={handleCopy} className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors" title="Copy">
+                        {showCopyMessage ? <span className="text-[10px] font-bold text-green-400">Copied!</span> : <ClipboardIcon className="w-4 h-4" />}
+                    </button>
+                    
+                    <button onClick={handleShare} className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors" title="Share">
+                        <ShareIcon className="w-4 h-4" />
+                    </button>
 
-              {message.sources && message.sources.length > 0 && (
-                  <div className="mt-3 border-t border-gray-600 pt-3">
-                      <h4 className="text-xs font-bold text-gray-400 mb-2">Sources:</h4>
-                      <ul className="space-y-1">
-                          {message.sources.map((source, index) => (
-                              <li key={index}>
-                                  <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-sm text-amber-400 hover:underline truncate block" title={source.uri}>
-                                      {index + 1}. {source.title || source.uri}
-                                  </a>
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-              )}
-            </div>
+                    {/* TTS Button */}
+                    {renderAudioButton()}
+
+                    <div className="relative" ref={downloadMenuRef}>
+                        <button onClick={() => setIsDownloadMenuOpen(!isDownloadMenuOpen)} className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors" title="Download">
+                            <DownloadIcon className="w-4 h-4" />
+                        </button>
+                        {isDownloadMenuOpen && (
+                            <div className="absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-20 min-w-[120px]">
+                                <button onClick={() => handleDownload('txt')} className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"><FileTxtIcon className="w-3 h-3"/> Text (.txt)</button>
+                                <button onClick={() => handleDownload('doc')} className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"><FileDocIcon className="w-3 h-3"/> Word (.doc)</button>
+                                <button onClick={() => handleDownload('csv')} className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"><FileCsvIcon className="w-3 h-3"/> CSV (.csv)</button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="w-px h-4 bg-gray-700 mx-1"></div>
+
+                    <button onClick={() => handleFeedbackClick('good')} className={`p-1.5 rounded-full transition-colors ${message.feedback === 'good' ? 'text-green-400 bg-green-900/20' : 'text-gray-400 hover:text-green-400 hover:bg-gray-700'}`} title="Good response">
+                        <ThumbsUpIcon className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => handleFeedbackClick('bad')} className={`p-1.5 rounded-full transition-colors ${message.feedback === 'bad' ? 'text-red-400 bg-red-900/20' : 'text-gray-400 hover:text-red-400 hover:bg-gray-700'}`} title="Bad response">
+                        <ThumbsDownIcon className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
+            
+            {/* Feedback Toast */}
+            {showFeedbackToast && (
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg border border-gray-700 animate-fade-in-up">
+                    Thanks for feedback!
+                </div>
+            )}
         </div>
-        {!isUser && !message.videoState && message.text && !isError && (
-          <div className="flex items-center gap-2 mt-2 pl-1">
-            {renderAudioButton()}
-            <button
-              onClick={() => handleFeedbackClick('good')}
-              className={`p-1.5 rounded-full transition-colors ${
-                message.feedback === 'good'
-                  ? 'text-amber-400 bg-amber-500/20'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-600'
-              }`}
-              aria-label="Good response"
-              title="Good response"
-            >
-              <ThumbsUpIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => handleFeedbackClick('bad')}
-              className={`p-1.5 rounded-full transition-colors ${
-                message.feedback === 'bad'
-                  ? 'text-red-400 bg-red-500/20'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-600'
-              }`}
-              aria-label="Bad response"
-              title="Bad response"
-            >
-              <ThumbsDownIcon className="w-4 h-4" />
-            </button>
-            <div className="h-4 w-px bg-gray-600 mx-1"></div>
-            <button
-              onClick={handleCopy}
-              className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-600 transition-colors"
-              aria-label="Copy message"
-              title="Copy"
-            >
-              <ClipboardIcon className="w-4 h-4" />
-            </button>
-            <div className="relative" ref={downloadMenuRef}>
-              <button
-                onClick={() => setIsDownloadMenuOpen(prev => !prev)}
-                className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-gray-600 transition-colors"
-                aria-label="Download message options"
-                aria-haspopup="true"
-                aria-expanded={isDownloadMenuOpen}
-                title="Download"
-              >
-                <DownloadIcon className="w-4 h-4" />
-              </button>
-              {isDownloadMenuOpen && (
-                <div className="absolute bottom-full mb-2 -left-1/2 transform translate-x-1/4 w-40 bg-gray-600 rounded-md shadow-lg z-10 animate-fade-in-slide-up" style={{animationDuration: '0.2s'}}>
-                  <button onClick={() => handleDownload('txt')} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-white hover:bg-gray-500 rounded-t-md">
-                    <FileTxtIcon className="w-4 h-4" /> As Text (.txt)
-                  </button>
-                  <button onClick={() => handleDownload('doc')} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-white hover:bg-gray-500">
-                    <FileDocIcon className="w-4 h-4" /> As Word (.doc)
-                  </button>
-                  <button onClick={() => handleDownload('csv')} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-white hover:bg-gray-500 rounded-b-md">
-                    <FileCsvIcon className="w-4 h-4" /> As Excel (.csv)
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

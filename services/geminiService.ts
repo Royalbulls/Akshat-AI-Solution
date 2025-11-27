@@ -7,22 +7,31 @@ function getFriendlyErrorMessage(error: unknown, context: string): string {
     const msg = error instanceof Error ? error.message : String(error);
     
     if (msg.includes("SAFETY") || msg.includes("blocked")) {
-        return `Safety block in ${context}: The AI found the content sensitive. Please try rephrasing your prompt.`;
+        return `I couldn't process that request because it triggered safety filters (${context}). Please try rephrasing your prompt to be less sensitive.`;
     }
     if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
-        return `Quota exceeded in ${context}. You may have hit the rate limit. Please wait a moment and try again.`;
+        return `Usage Limit Reached: We are receiving too many requests right now. Please wait a moment and try again.`;
     }
-    if (msg.includes("401") || msg.includes("403") || msg.includes("API key") || msg.includes("PERMISSION_DENIED")) {
-        return `Access denied in ${context}. Please check your API key permissions or model availability.`;
+    if (msg.includes("401") || msg.includes("API key")) {
+        return `Authentication Failed: The API key appears to be missing or invalid. Please check your settings.`;
     }
-    if (msg.includes("NetworkError") || msg.includes("fetch failed")) {
-        return `Network error during ${context}. Please check your internet connection.`;
+    if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
+        return `Access Denied: You don't have permission to use this feature (${context}). It might require a specific account tier or location.`;
     }
-    if (msg.includes("JSON")) {
-        return `Data format error in ${context}. The AI returned an invalid structure. Please try again or simplify your request.`;
+    if (msg.includes("404") || msg.includes("NOT_FOUND")) {
+        return `Service Unavailable: The AI model required for ${context} is currently not found or deprecated.`;
+    }
+    if (msg.includes("503") || msg.includes("overloaded")) {
+        return `Server Overload: The AI service is experiencing high traffic. Please try again in a few seconds.`;
+    }
+    if (msg.includes("NetworkError") || msg.includes("fetch failed") || msg.includes("Failed to fetch")) {
+        return `Connection Error: Unable to reach the AI servers. Please check your internet connection.`;
+    }
+    if (msg.includes("JSON") || msg.includes("SyntaxError")) {
+        return `Processing Error: I encountered an issue understanding the AI's response for ${context}. Please try again.`;
     }
     
-    return `Error in ${context}: ${msg.substring(0, 150)}${msg.length > 150 ? '...' : ''}`;
+    return `An unexpected error occurred during ${context}. Details: ${msg.substring(0, 150)}${msg.length > 150 ? '...' : ''}`;
 }
 
 // This will be the single function for the 'smart' mode, replacing runChat, runSearchGroundedChat, and runMapsGroundedChat
@@ -87,14 +96,20 @@ export async function runChatWithThinking(prompt: string, history: {role: 'user'
 export async function generateImage(prompt: string): Promise<string> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Helper to extract image from response
+    // Helper to extract image from response safely
     const extractImage = (response: GenerateContentResponse): string => {
-        if (response.candidates && response.candidates[0].content.parts) {
-            for (const part of response.candidates[0].content.parts) {
+        const parts = response.candidates?.[0]?.content?.parts;
+        if (parts) {
+            for (const part of parts) {
                 if (part.inlineData) {
                     return `data:image/png;base64,${part.inlineData.data}`;
                 }
             }
+        }
+        // Check for safety ratings/block reasons if no image
+        const finishReason = response.candidates?.[0]?.finishReason;
+        if (finishReason) {
+             throw new Error(`Image generation blocked. Reason: ${finishReason}`);
         }
         throw new Error("No image data found in response.");
     };
@@ -343,7 +358,8 @@ export async function createAgentTaskPlan(goal: string): Promise<AgentStep[]> {
                     },
                     required: ['plan'],
                 },
-                 thinkingConfig: { thinkingBudget: 16384 }
+                 thinkingConfig: { thinkingBudget: 16384 },
+                 tools: [{ googleSearch: {} }]
             },
         });
 
@@ -369,9 +385,14 @@ export async function generateAgentTaskDraft(goal: string, plan: AgentStep[]): P
             You have this plan:
             ${planString}
 
-            Execute the 'Action' step by producing a comprehensive, in-depth initial draft. Structure your response logically with clear headings using Markdown. Ensure the analysis is thorough and directly addresses the user's original goal with supporting details.`,
+            Your task is to execute the 'Action' step.
+            First, use Google Search to gather real-world information and data points ("Perception" & "Learning") relevant to the goal.
+            Then, synthesize this information to produce a comprehensive, in-depth initial draft. 
+            
+            Structure your response logically with clear headings using Markdown. Ensure the analysis is thorough and directly addresses the user's original goal with supporting details found during research.`,
             config: {
-                 thinkingConfig: { thinkingBudget: 32768 }
+                 thinkingConfig: { thinkingBudget: 32768 },
+                 tools: [{ googleSearch: {} }]
             }
         });
         return response.text || "Draft generation failed.";
@@ -392,8 +413,10 @@ export async function selfCorrectAgentResult(goal: string, draft: string): Promi
             ${draft}
             --- DRAFT END ---
 
-            Now, perform the 'Self-Correction' step. Your task is to elevate this draft to a publication-ready standard. Critically review it for:
-            1. **Accuracy:** Verify facts and data points.
+            Now, perform the 'Self-Correction' step. Your task is to elevate this draft to a publication-ready standard.
+            Use Google Search to verify any factual claims or data points in the draft.
+            Critically review it for:
+            1. **Accuracy:** Verify facts and data points against real-time search results.
             2. **Clarity:** Improve sentence structure and remove jargon.
             3. **Depth:** Add nuance and deeper insights where possible.
             4. **Completeness:** Ensure all aspects of the original goal are fully met.
@@ -401,7 +424,8 @@ export async function selfCorrectAgentResult(goal: string, draft: string): Promi
 
             Provide ONLY the final, polished, and significantly improved version. Use Markdown for professional formatting.`,
             config: {
-                 thinkingConfig: { thinkingBudget: 32768 }
+                 thinkingConfig: { thinkingBudget: 32768 },
+                 tools: [{ googleSearch: {} }]
             }
         });
         return response.text || draft;
@@ -889,11 +913,14 @@ export async function generateComicScript(
     }
 }
 
-export async function generateStructuredProject(template: string, userInput: string): Promise<AutomationProject> {
+export async function generateStructuredProject(template: string, userInput: string, language: string = 'English'): Promise<AutomationProject> {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `
     You are an expert ${template}. 
     User Request: "${userInput}"
+    
+    IMPORTANT: Generate all text content (titles, sections, body text) in the following language: "${language}".
+    However, the "imagePrompt" field MUST remain in English to ensure the image generator understands it correctly.
     
     Your goal is to generate a comprehensive, high-quality output divided into clear, logical panels (sections).
     
@@ -901,13 +928,13 @@ export async function generateStructuredProject(template: string, userInput: str
     
     Return a strict JSON object with the following structure:
     {
-        "title": "A creative and relevant title for this project",
+        "title": "A creative and relevant title for this project (in ${language})",
         "type": "${template}",
         "sections": [
             {
-                "title": "Heading for Section 1 (e.g., Executive Summary, Chapter 1, Introduction)",
-                "content": "Detailed content for this section. Use Markdown for formatting (bold, bullets, etc.). Ensure this is substantive and useful.",
-                "imagePrompt": "A highly detailed, visual description of an image that represents this section. Include style keywords."
+                "title": "Heading for Section 1 (e.g., Executive Summary, Chapter 1, Introduction) (in ${language})",
+                "content": "Detailed content for this section in ${language}. Use Markdown for formatting (bold, bullets, etc.). Ensure this is substantive and useful.",
+                "imagePrompt": "A highly detailed, visual description of an image that represents this section. Include style keywords. (MUST BE IN ENGLISH)"
             },
             {
                 "title": "Heading for Section 2",

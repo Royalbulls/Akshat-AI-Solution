@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { ShareIcon } from './Icons';
 
 interface ImageHistoryItem {
   id: number;
@@ -15,6 +17,28 @@ interface ImageGalleryProps {
 
 const ImageGallery: React.FC<ImageGalleryProps> = ({ isOpen, onClose, history, onRegenerate }) => {
   if (!isOpen) return null;
+
+  const handleShare = async (item: ImageHistoryItem) => {
+      try {
+          const res = await fetch(item.imageUrl);
+          const blob = await res.blob();
+          const file = new File([blob], "image.png", { type: blob.type });
+          
+          const shareData = {
+              title: 'Shared from Akshat AI',
+              text: `Generated Image: "${item.prompt}"`,
+              files: [file]
+          };
+
+          if (navigator.canShare && navigator.canShare(shareData)) {
+              await navigator.share(shareData);
+          } else {
+              alert("Sharing not supported on this device.");
+          }
+      } catch (e) {
+          console.error("Error sharing image", e);
+      }
+  };
 
   return (
     <div 
@@ -54,14 +78,23 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ isOpen, onClose, history, o
                     alt={item.prompt} 
                     className="w-full h-48 object-cover transition-transform duration-300 group-hover:scale-105" 
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex flex-col justify-end">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent p-3 flex flex-col justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <p className="text-xs text-gray-300 line-clamp-3 mb-2">{item.prompt}</p>
-                    <button
-                      onClick={() => onRegenerate(item.prompt)}
-                      className="w-full text-center text-xs font-semibold bg-amber-600 text-white py-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-amber-400"
-                    >
-                      Re-generate
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                        onClick={() => onRegenerate(item.prompt)}
+                        className="flex-1 text-center text-xs font-semibold bg-amber-600 text-white py-1.5 rounded-md hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-amber-400"
+                        >
+                        Re-generate
+                        </button>
+                        <button
+                            onClick={() => handleShare(item)}
+                            className="p-1.5 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+                            title="Share Image"
+                        >
+                            <ShareIcon className="w-4 h-4" />
+                        </button>
+                    </div>
                   </div>
                 </div>
               ))}

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { BriefcaseIcon, ChartPieIcon, MegaphoneIcon, LightBulbIcon, PresentationChartBarIcon, CurrencyDollarIcon, FingerPrintIcon, MapPinIcon, EnvelopeIcon, FlagIcon, SearchIcon, ShieldCheckIcon, UserIcon } from './Icons';
+import { BriefcaseIcon, ChartPieIcon, MegaphoneIcon, LightBulbIcon, PresentationChartBarIcon, CurrencyDollarIcon, FingerPrintIcon, MapPinIcon, EnvelopeIcon, FlagIcon, SearchIcon, ShieldCheckIcon, UserIcon, DocumentTextIcon } from './Icons';
 
 interface BusinessHubViewProps {
   onStartTask: (prompt: string, goal: string) => void;
@@ -67,6 +67,14 @@ const businessTools: BusinessTool[] = [
     icon: <FlagIcon className="w-8 h-8 text-red-400" />,
     category: 'strategy',
     promptTemplate: (input) => `Act as a market researcher. My business is: "${input}". Help me conduct a competitor analysis. Identify 3 potential types of direct or indirect competitors. For each, list likely strengths and weaknesses. Then, define my "Unfair Advantage" or Unique Value Proposition (UVP) that differentiates me from them.`
+  },
+  {
+    id: 'pivot_strategist',
+    title: 'Pivot Strategist',
+    description: 'Analyze market shifts and suggest business model adaptations.',
+    icon: <LightBulbIcon className="w-8 h-8 text-indigo-400" />,
+    category: 'strategy',
+    promptTemplate: (input) => `Act as a Startup Mentor and Crisis Manager. My current business situation/problem is: "${input}". Analyze if I should pivot. Suggest 3 alternative business models or strategic pivots that leverage my existing assets but address the market failure. For each pivot, explain the 'Why' and the 'How'.`
   },
 
   // Marketing Tools
@@ -143,6 +151,21 @@ const businessTools: BusinessTool[] = [
 
   // Finance & Career Tools
   {
+    id: 'wealth_planner',
+    title: 'Personal Wealth Planner',
+    description: 'Create a basic financial plan based on income and goals.',
+    icon: <CurrencyDollarIcon className="w-8 h-8 text-emerald-300" />,
+    category: 'finance_career',
+    promptTemplate: (input) => `Act as a Certified Financial Planner (CFP) optimized for the Indian context. My financial profile/goals are: "${input}" (e.g., Monthly Salary, Age, Key Goals). 
+    
+    Create a comprehensive financial roadmap:
+    1. **Budgeting Rule:** Suggest a 50/30/20 split or similar suitable model.
+    2. **Emergency Fund:** Calculate the required safety net.
+    3. **Investment Allocation:** Suggest a portfolio mix (Equity/Mutual Funds vs Debt/PPF vs Gold) based on my age and risk profile.
+    4. **Tax Planning:** Briefly mention relevant sections like 80C, 80D, etc.
+    5. **Actionable First Steps:** What should I do this week?`
+  },
+  {
     id: 'career_roadmap',
     title: 'Career Path Strategist',
     description: 'Design a step-by-step career growth plan tailored for India.',
@@ -154,6 +177,32 @@ const businessTools: BusinessTool[] = [
     3. **Networking Strategy** (LinkedIn & Local Communities). 
     4. A **1-Year, 3-Year, and 5-Year progression plan**. 
     5. **Salary expectations** in Tier 1 vs Tier 2 cities for this role.`
+  },
+  {
+    id: 'resume_review',
+    title: 'Resume / CV Optimizer',
+    description: 'Analyze your resume for ATS compatibility and impact.',
+    icon: <DocumentTextIcon className="w-8 h-8 text-teal-200" />,
+    category: 'finance_career',
+    promptTemplate: (input) => `Act as a Senior HR Recruiter and Resume Writer. I am providing my resume details or summary here: "${input}". 
+    
+    Please review it for:
+    1. **ATS Compatibility:** Identify keywords missing for a typical role in my field.
+    2. **Impact Statements:** Rewrite 3 bullet points to be more results-oriented (using numbers/metrics).
+    3. **Formatting/Structure:** Suggest improvements for readability.
+    4. **Red Flags:** Point out any gaps or weak areas that recruiters might question.`
+  },
+  {
+    id: 'interview_coach',
+    title: 'Mock Interview Simulator',
+    description: 'Practice answering tough interview questions.',
+    icon: <UserIcon className="w-8 h-8 text-teal-500" />,
+    category: 'finance_career',
+    promptTemplate: (input) => `Act as a tough Interviewer for a top-tier company. I am applying for the role of: "${input}". 
+    
+    1. Ask me 3 challenging technical or situational questions relevant to this role.
+    2. For each question, provide a "Model Answer" structure (using the STAR method).
+    3. Give me tips on body language and tone for this specific industry.`
   },
   {
     id: 'loan_advisor',
@@ -228,9 +277,9 @@ const BusinessHubView: React.FC<BusinessHubViewProps> = ({ onStartTask }) => {
                 <div className="inline-block p-3 bg-amber-500/10 rounded-full mb-4">
                     <BriefcaseIcon className="w-12 h-12 text-amber-500" />
                 </div>
-                <h2 className="text-4xl font-bold neon-text-gold mb-2">Business Intelligence Hub</h2>
+                <h2 className="text-4xl font-bold neon-text-gold mb-2">Strategic Advisory Hub</h2>
                 <p className="text-gray-400 text-lg">
-                    A dedicated module for startups and SMEs to generate pitch decks, SWOT analyses, and financial roadmaps instantly.
+                    Expert guidance across Business Strategy, Financial Planning, and Career Development.
                 </p>
             </header>
 
@@ -240,7 +289,7 @@ const BusinessHubView: React.FC<BusinessHubViewProps> = ({ onStartTask }) => {
             {renderCategory("Finance & Career Growth", "finance_career")}
             
             <footer className="mt-8 text-sm text-gray-500 pb-8">
-                Powered by Akshat's specialized business intelligence models.
+                Powered by Akshat's specialized enterprise advisory models.
             </footer>
         </div>
     );

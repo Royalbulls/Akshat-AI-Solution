@@ -1,6 +1,5 @@
-
-import React, { useState } from 'react';
-import { CloseIcon, SparklesIcon, ImageIcon, SettingsIcon, BotIcon, PlusIcon, PencilIcon, TrashIcon, GitHubIcon, JournalIcon, AgentIcon, GlobeAltIcon, MapPinIcon, OmIcon, WrenchScrewdriverIcon, UserIcon, BriefcaseIcon, CpuChipIcon, BookOpenIcon, NewspaperIcon, ScaleIcon, MicrophoneIcon, ArrowRightOnRectangleIcon, FilmIcon } from './Icons';
+import React, { useState, useEffect } from 'react';
+import { CloseIcon, SparklesIcon, ImageIcon, SettingsIcon, BotIcon, PlusIcon, PencilIcon, TrashIcon, GitHubIcon, JournalIcon, AgentIcon, GlobeAltIcon, MapPinIcon, OmIcon, WrenchScrewdriverIcon, UserIcon, BriefcaseIcon, CpuChipIcon, BookOpenIcon, NewspaperIcon, ScaleIcon, MicrophoneIcon, ArrowRightOnRectangleIcon, FilmIcon, DownloadIcon } from './Icons';
 import { ChatMode, CustomPersona, ViewMode, PREDEFINED_PERSONAS, LEGENDARY_PERSONAS, AuthUser } from '../types';
 
 interface SidebarProps {
@@ -92,7 +91,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     onLogout
 }) => {
   // Force dark background for "Grey Black" look requested
-  const sidebarClasses = `fixed inset-y-0 left-0 z-40 w-72 bg-gray-900 border-r border-gray-800 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`;
+  const sidebarClasses = `fixed inset-y-0 left-0 z-40 w-72 bg-gray-900 border-r border-gray-800 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col ${isOpen ? 'translate-x-0' : '-translate-x-full'}`;
   
   // Collapsible sections state
   const [sections, setSections] = useState({
@@ -104,6 +103,31 @@ const Sidebar: React.FC<SidebarProps> = ({
       core: false, // Collapsed by default
       custom: true,
   });
+
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    }
+  };
 
   const toggleSection = (section: keyof typeof sections) => {
       setSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -125,13 +149,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const expertPersonas = PREDEFINED_PERSONAS.filter(p => expertIds.includes(p.id));
   const corePersonas = PREDEFINED_PERSONAS.filter(p => coreIds.includes(p.id));
 
-  const allPersonas = [...PREDEFINED_PERSONAS, ...LEGENDARY_PERSONAS, ...customPersonas];
-
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black bg-opacity-60 z-30 md:hidden backdrop-blur-sm" onClick={onClose} aria-hidden="true"></div>}
       <aside className={sidebarClasses} aria-label="Sidebar">
-        <div className="flex flex-col h-full text-gray-100">
+        <div className="flex flex-col h-full text-gray-100 overflow-hidden">
             <div 
                 className="flex items-center justify-between px-4 py-5 border-b border-gray-800 flex-shrink-0 cursor-pointer md:cursor-default hover:bg-gray-800/50 transition-colors"
                 onClick={() => window.innerWidth < 768 && onClose()} // Touch header to close on mobile
@@ -155,7 +177,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </SidebarSection>
 
                 <SidebarSection title="Tools" isOpen={sections.tools} onToggle={() => toggleSection('tools')}>
-                    <NavButton icon={<BriefcaseIcon className="w-5 h-5 text-blue-300" />} label="Business Intelligence Hub" isActive={viewMode === 'business_hub'} onClick={() => setViewMode('business_hub')} />
+                    <NavButton icon={<BriefcaseIcon className="w-5 h-5 text-blue-300" />} label="Strategic Advisory Hub" isActive={viewMode === 'business_hub'} onClick={() => setViewMode('business_hub')} />
                     <NavButton icon={<OmIcon className="w-5 h-5 text-amber-300" />} label="Predictive Analytics (Kundli)" isActive={viewMode === 'public_kundli'} onClick={() => setViewMode('public_kundli')} />
                     <NavButton icon={<FilmIcon className="w-5 h-5 text-red-400" />} label="Video Creation Studio" isActive={viewMode === 'video_studio'} onClick={() => setViewMode('video_studio')} />
                     <NavButton icon={<BookOpenIcon className="w-5 h-5 text-purple-300" />} label="Multiverse Comics" isActive={viewMode === 'comic_creator'} onClick={() => setViewMode('comic_creator')} />
@@ -255,9 +277,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </SidebarSection>
             </nav>
 
+            {/* Install Prompt - Fixed at bottom if available */}
+            {deferredPrompt && (
+                <div className="px-4 py-2 border-t border-gray-800 bg-gray-900/50">
+                     <button
+                        onClick={handleInstallClick}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-bold text-amber-900 bg-gradient-to-r from-amber-500 to-amber-400 rounded-md hover:from-amber-400 hover:to-amber-300 transition-all shadow-lg animate-pulse"
+                    >
+                        <DownloadIcon className="w-5 h-5" />
+                        Install App
+                    </button>
+                </div>
+            )}
+
             {/* User Profile & Logout */}
             {authUser && (
-                <div className="p-4 border-t border-gray-800 bg-gray-900/50">
+                <div className="p-4 border-t border-gray-800 bg-gray-900/50 flex-shrink-0">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center text-white font-bold">
                             {authUser.name.charAt(0).toUpperCase()}

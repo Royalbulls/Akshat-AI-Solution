@@ -136,9 +136,56 @@ const MultiverseComicView: React.FC<MultiverseComicViewProps> = ({ customPersona
         setIsBatchGenerating(false);
     };
 
+    const handleExportComic = () => {
+        if (panels.length === 0) return;
+        
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Comic Export</title>
+                <style>
+                    body { font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif; background: #f0f0f0; padding: 20px; }
+                    h1 { text-align: center; }
+                    .comic-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+                    .panel { background: white; border: 3px solid #000; box-shadow: 5px 5px 0px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+                    .panel-image { width: 100%; height: auto; border-bottom: 2px solid #000; }
+                    .panel-content { padding: 15px; flex: 1; }
+                    .caption { background: #fff3cd; border: 1px solid #ffeeba; padding: 5px 10px; margin-bottom: 10px; font-style: italic; font-size: 0.9em; }
+                    .dialogue { font-weight: bold; }
+                    @media print { body { background: white; } .panel { break-inside: avoid; } }
+                </style>
+            </head>
+            <body>
+                <h1>Comic Strip</h1>
+                <div class="comic-grid">
+                    ${panels.map(panel => `
+                        <div class="panel">
+                            ${panel.imageUrl ? `<img src="${panel.imageUrl}" class="panel-image" alt="Panel ${panel.id}" />` : `<div style="height:200px; background:#ccc; display:flex; align-items:center; justify-content:center;">[Image Pending]</div>`}
+                            <div class="panel-content">
+                                ${panel.caption ? `<div class="caption">${panel.caption}</div>` : ''}
+                                <div class="dialogue">"${panel.dialogue}"</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </body>
+            </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Comic_Strip_${Date.now()}.html`;
+        a.click();
+    };
+
     return (
         <div className="h-full bg-gray-900 text-white p-4 md:p-6 overflow-y-auto animate-fade-in-slide-up">
-            <header className="mb-8 border-b border-purple-500/30 pb-4">
+            <header className="mb-8 border-b border-purple-500/30 pb-4 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-900/30 rounded-lg border border-purple-500/30">
                         <BookOpenIcon className="w-8 h-8 text-purple-400" />
@@ -148,6 +195,15 @@ const MultiverseComicView: React.FC<MultiverseComicViewProps> = ({ customPersona
                         <p className="text-xs text-purple-400 uppercase tracking-widest">Powered by Gemini 3 Pro & Imagen 3</p>
                     </div>
                 </div>
+                {panels.length > 0 && (
+                    <button 
+                        onClick={handleExportComic}
+                        className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors"
+                    >
+                        <DownloadIcon className="w-4 h-4" />
+                        Export Comic (HTML)
+                    </button>
+                )}
             </header>
 
             {/* Configuration Panel */}
