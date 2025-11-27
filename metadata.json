@@ -1,0 +1,9 @@
+{
+  "name": "Akshat AI Solution",
+  "description": "An enterprise-grade AI solution integrating Generative AI for Business Strategy, Content Automation, Predictive Analytics (Kundli), and Real-time Vision capabilities. Built on Google Gemini & Cloud.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation",
+    "camera"
+  ]
+}
