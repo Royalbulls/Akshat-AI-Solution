@@ -256,7 +256,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isLoading, s
 
 
   return (
-    <div className="bg-gray-900 px-4 pt-2 pb-3 border-t border-gray-700">
+    <div className="bg-gray-900 px-4 pt-2 pb-3">
       {recordingStatus === 'idle' && !selectedFile && !micError && (
         <div className="px-2 pb-2 flex items-center gap-2 overflow-x-auto no-scrollbar">
           <button
@@ -274,14 +274,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isLoading, s
             aria-label="Use image generation command"
           >
             /image ✨
-          </button>
-           <button
-            type="button"
-            onClick={() => handleSuggestionClick('/video')}
-            className="px-3 py-1 text-xs bg-gray-700 text-gray-300 rounded-full hover:bg-gray-600 hover:text-white transition-colors whitespace-nowrap"
-            aria-label="Use video generation command"
-          >
-            /video 🎥
           </button>
         </div>
       )}

@@ -62,11 +62,18 @@ const businessTools: BusinessTool[] = [
   },
   {
     id: 'competitor_analysis',
-    title: 'Competitor Analysis Framework',
-    description: 'Analyze potential rivals and define your competitive advantage.',
+    title: 'Deep Competitor Intelligence',
+    description: 'Live market search for rivals, comparison matrix, and gap analysis.',
     icon: <FlagIcon className="w-8 h-8 text-red-400" />,
     category: 'strategy',
-    promptTemplate: (input) => `Act as a market researcher. My business is: "${input}". Help me conduct a competitor analysis. Identify 3 potential types of direct or indirect competitors. For each, list likely strengths and weaknesses. Then, define my "Unfair Advantage" or Unique Value Proposition (UVP) that differentiates me from them.`
+    promptTemplate: (input) => `Act as a Strategic Market Analyst. My business/product is: "${input}". 
+    
+    Perform a deep Competitor Analysis using Google Search (Search Grounding).
+    1. **Identify Real Competitors:** Find 3-5 actual companies currently operating in this space (Direct and Indirect).
+    2. **Comparison Matrix:** Create a comparison table comparing Me vs. Them on: Pricing, Key Features, Target Audience, and Tech Stack.
+    3. **Gap Analysis (The Blue Ocean):** What are they missing? What customer complaints do they have? Identify the "White Space" I can capture.
+    4. **Unfair Advantage:** Define my Unique Value Proposition (UVP) that differentiates me from these specific rivals.
+    5. **Verdict:** A concluding strategic recommendation on how to win 10x market share.`
   },
   {
     id: 'pivot_strategist',

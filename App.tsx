@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, Role, Source, CustomPersona, ChatMode, PREDEFINED_PERSONAS, ViewMode, JournalEntry, UserProfile, Mood, RelationshipDynamic, PersonalityTraits, AgentTask, AgentStep, PersonalityEvolution, PersonaSpaceContent, PersonaFeedback, VoiceName, TimelineEntry, KundliDetails, PublicKundliPersona, AppSettings, LEGENDARY_PERSONAS, TranscriptionPart, AuthUser } from './types';
 import Header from './components/Header';
@@ -20,7 +21,7 @@ import RoboticsView from './components/RoboticsView';
 import MultiverseComicView from './components/MultiverseComicView';
 import AutomationHubView from './components/AutomationHubView';
 import AuthView from './components/AuthView';
-import { runSmartChat, generateImage, startVideoGeneration, getVideoOperation, runChatWithThinking, detectMood, getJournalFeedback, getCbtPrompt, createAgentTaskPlan, generateAgentTaskDraft, selfCorrectAgentResult, generatePersonaSpaceContent, generateSpeech, getAddressForCoordinates, fetchAstrologicalData, generateKundliPersonaInstruction, synthesizeAnshPersona, generateConversationSummary, editImageWithAvatar } from './services/geminiService';
+import { runSmartChat, generateImage, startVideoGeneration, getVideoOperation, runChatWithThinking, detectMood, getJournalFeedback, getCbtPrompt, createAgentTaskPlan, generateAgentTaskDraft, selfCorrectAgentResult, generatePersonaSpaceContent, generateSpeech, getAddressForCoordinates, fetchAstrologicalData, generateKundliPersonaInstruction, synthesizeAnshPersona, generateConversationSummary, editImageWithAvatar, generateConversationContext } from './services/geminiService';
 import { BotIcon, SparklesIcon, AgentIcon, BriefcaseIcon, LightBulbIcon, BeakerIcon, NewspaperIcon, ScaleIcon, WrenchScrewdriverIcon, SearchIcon, MicrophoneIcon, DocumentTextIcon, DownloadIcon, ClipboardIcon, FileTxtIcon, FileDocIcon } from './components/Icons';
 import { GoogleGenAI, Operation, Modality, LiveServerMessage, LiveSession, Blob as GenAI_Blob } from '@google/genai';
 
@@ -407,6 +408,8 @@ export const App: React.FC = () => {
   
   // Use a ref to track video operations
   const videoOperations = useRef<{ [key: number]: Operation }>({});
+  // Use a ref for auto-scrolling
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentPersona = [...PREDEFINED_PERSONAS, ...LEGENDARY_PERSONAS, ...customPersonas].find(p => p.id === selectedPersonaId) || PREDEFINED_PERSONAS[0];
 
@@ -469,52 +472,26 @@ export const App: React.FC = () => {
       // Optional: clear session data or keep it
   };
 
-  useEffect(() => {
-    localStorage.setItem('aura_custom_personas', JSON.stringify(customPersonas));
-  }, [customPersonas]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_chat_history', JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_image_history', JSON.stringify(imageHistory));
-  }, [imageHistory]);
-
-  useEffect(() => {
-      localStorage.setItem('aura_journal_entries', JSON.stringify(journalEntries));
-  }, [journalEntries]);
-
-  useEffect(() => {
-      localStorage.setItem('aura_user_profile', JSON.stringify(userProfile));
-  }, [userProfile]);
-
-  useEffect(() => {
-      localStorage.setItem('aura_timeline', JSON.stringify(timeline));
-  }, [timeline]);
-
-  useEffect(() => {
-      localStorage.setItem('aura_tracking_enabled', JSON.stringify(isTracking));
-  }, [isTracking]);
-  
-  useEffect(() => {
-      if (kundliDetails) localStorage.setItem('aura_kundli_details', JSON.stringify(kundliDetails));
-  }, [kundliDetails]);
-
-  useEffect(() => {
-      localStorage.setItem('aura_public_personas', JSON.stringify(publicPersonas));
-  }, [publicPersonas]);
-  
-  useEffect(() => {
+  // Local Storage Sync Effects
+  useEffect(() => { localStorage.setItem('aura_custom_personas', JSON.stringify(customPersonas)); }, [customPersonas]);
+  useEffect(() => { localStorage.setItem('aura_chat_history', JSON.stringify(messages)); }, [messages]);
+  useEffect(() => { localStorage.setItem('aura_image_history', JSON.stringify(imageHistory)); }, [imageHistory]);
+  useEffect(() => { localStorage.setItem('aura_journal_entries', JSON.stringify(journalEntries)); }, [journalEntries]);
+  useEffect(() => { localStorage.setItem('aura_user_profile', JSON.stringify(userProfile)); }, [userProfile]);
+  useEffect(() => { localStorage.setItem('aura_timeline', JSON.stringify(timeline)); }, [timeline]);
+  useEffect(() => { localStorage.setItem('aura_tracking_enabled', JSON.stringify(isTracking)); }, [isTracking]);
+  useEffect(() => { if (kundliDetails) localStorage.setItem('aura_kundli_details', JSON.stringify(kundliDetails)); }, [kundliDetails]);
+  useEffect(() => { localStorage.setItem('aura_public_personas', JSON.stringify(publicPersonas)); }, [publicPersonas]);
+  useEffect(() => { 
       localStorage.setItem('aura_app_settings', JSON.stringify(appSettings));
-      // Apply theme
-      if (appSettings.theme === 'light') {
-          document.documentElement.classList.remove('dark');
-      } else {
-          document.documentElement.classList.add('dark');
-      }
+      if (appSettings.theme === 'light') document.documentElement.classList.remove('dark');
+      else document.documentElement.classList.add('dark');
   }, [appSettings]);
 
+  // Auto-scroll effect for chat
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading, viewMode]);
 
   // Location Tracking Logic
   useEffect(() => {
@@ -531,9 +508,7 @@ export const App: React.FC = () => {
                       timestamp,
                       isResolvingAddress: true
                   };
-                  
                   setTimeline(prev => [newEntry, ...prev]);
-
                   try {
                       const address = await getAddressForCoordinates(latitude, longitude);
                       setTimeline(prev => prev.map(e => e.id === newEntry.id ? { ...e, address, isResolvingAddress: false } : e));
@@ -586,20 +561,18 @@ export const App: React.FC = () => {
     if (currentPersona.verbosity && currentPersona.verbosity !== 'default') systemInstruction += `Be ${currentPersona.verbosity}.\n`;
     if (currentPersona.relationshipDynamic && currentPersona.relationshipDynamic !== 'default') systemInstruction += `Relationship dynamic: ${currentPersona.relationshipDynamic}.\n`;
     
-    // Inject Personality Traits
     if (currentPersona.personalityTraits) {
         const { humor, empathy, assertiveness } = currentPersona.personalityTraits;
-        systemInstruction += `\nPersonality Matrix (0-100 Scale):\n- Humor: ${humor} (Adjust wit and joke frequency)\n- Empathy: ${empathy} (Adjust emotional warmth and validation)\n- Assertiveness: ${assertiveness} (Adjust directness and confidence)\n`;
+        systemInstruction += `\nPersonality Matrix (0-100 Scale):\n- Humor: ${humor}\n- Empathy: ${empathy}\n- Assertiveness: ${assertiveness}\n`;
     }
 
-    // Inject Personality Evolution
     if (currentPersona.personalityEvolution?.dynamicGrowth) {
-        systemInstruction += `\n**Evolution Mode: ENABLED**\nLearning Rate: ${currentPersona.personalityEvolution.learningRate}.\nPay close attention to the user's implicit feedback, tone, and preferences. Subtly shift your personality traits over time to better align with what the user responds positively to.\n`;
+        systemInstruction += `\n**Evolution Mode: ENABLED**\nLearning Rate: ${currentPersona.personalityEvolution.learningRate}.\nPay close attention to the user's implicit feedback and preferences.\n`;
     }
 
-    if (userProfile.name) systemInstruction += `The user's name is ${userProfile.name}.\n`;
-    if (userProfile.preferences.length > 0) systemInstruction += `User preferences: ${userProfile.preferences.join(', ')}.\n`;
-    if (userProfile.conversationSummary) systemInstruction += `Previous context: ${userProfile.conversationSummary}\n`;
+    if (userProfile.name) systemInstruction += `\n**USER CONTEXT:**\nUser's name: ${userProfile.name}.\n`;
+    if (userProfile.preferences.length > 0) systemInstruction += `User Preferences & Facts: ${userProfile.preferences.join(', ')}.\n`;
+    if (userProfile.conversationSummary) systemInstruction += `Previous Conversation Context (Long-term Memory): ${userProfile.conversationSummary}\n`;
 
     try {
         let responseText = '';
@@ -612,69 +585,22 @@ export const App: React.FC = () => {
                 const imageUrl = await editImageWithAvatar({data: base64Image, mimeType: file.type}, currentPersona);
                  setMessages((prev) => [
                     ...prev,
-                    {
-                        id: Date.now() + 1,
-                        role: Role.MODEL,
-                        text: `Here is the edited image based on your request!`,
-                        imageUrl: imageUrl
-                    },
+                    { id: Date.now() + 1, role: Role.MODEL, text: `Here is the edited image based on your request!`, imageUrl: imageUrl },
                 ]);
                 setImageHistory(prev => [...prev, { id: Date.now(), prompt: `Edit: ${text}`, imageUrl }]);
              } else {
                 const imageUrl = await generateImage(imagePrompt);
                 setMessages((prev) => [
                     ...prev,
-                    {
-                        id: Date.now() + 1,
-                        role: Role.MODEL,
-                        text: `Here is an image for: "${imagePrompt}"`,
-                        imageUrl: imageUrl
-                    },
+                    { id: Date.now() + 1, role: Role.MODEL, text: `Here is an image for: "${imagePrompt}"`, imageUrl: imageUrl },
                 ]);
                 setImageHistory(prev => [...prev, { id: Date.now(), prompt: imagePrompt, imageUrl }]);
              }
             setIsLoading(false);
             return;
-        } else if (text.startsWith('/video ')) {
-             const videoPrompt = text.replace('/video ', '');
-             const tempId = Date.now() + 1;
-             
-             let imagePart;
-             let placeholderUrl;
-             let aspectRatio: '16:9' | '9:16' = '16:9';
-             
-             if (file && file.type.startsWith('image/')) {
-                 const base64 = await fileToBase64(file);
-                 imagePart = { imageBytes: base64, mimeType: file.type };
-                 placeholderUrl = URL.createObjectURL(file);
-                 
-                 try {
-                    const dims = await getImageDimensions(file);
-                    if (dims.height > dims.width) {
-                        aspectRatio = '9:16';
-                    }
-                 } catch (e) { console.warn("Could not get image dimensions for video aspect ratio", e); }
-             }
-
-             const operation = await startVideoGeneration(videoPrompt, aspectRatio, imagePart);
-             
-             setMessages((prev) => [
-                ...prev,
-                {
-                    id: tempId,
-                    role: Role.MODEL,
-                    text: `Generating video for: "${videoPrompt}"... this may take a minute.`,
-                    videoState: 'generating',
-                    operation: operation,
-                    placeholderImageUrl: placeholderUrl
-                },
-             ]);
-             
-             // Poll for video completion
-             pollVideoStatus(tempId, operation);
-             setIsLoading(false);
-             return;
-        }
+        } 
+        
+        // Removed /video command block as per request to remove video creation studio features.
 
         // Regular Chat Handling
         if (chatMode === 'think') {
@@ -686,10 +612,6 @@ export const App: React.FC = () => {
         } else {
              const history = messages.map(m => {
                 const parts: any[] = [];
-                if (m.imageUrl && m.role === Role.USER) {
-                     // We can't easily get back the base64 from the blob URL here without fetching
-                     // For simplicity, we assume the image prompt handles image inputs differently
-                }
                  if (m.text) parts.push({ text: m.text });
                  return { role: m.role, parts };
              });
@@ -702,23 +624,19 @@ export const App: React.FC = () => {
 
              let fileData;
              if (file) {
-                 // Check if file is a text type that should be read as text
                  const textTypes = ['text/', 'application/json', 'application/javascript', 'application/xml'];
                  const isText = textTypes.some(t => file.type.startsWith(t)) || file.name.endsWith('.ts') || file.name.endsWith('.tsx') || file.name.endsWith('.md');
                  
                  if (isText && !file.type.startsWith('text/csv')) { 
-                     // Treat most text files as appended text to the prompt for better analysis
                      try {
                          const textContent = await file.text();
                          text = `${text}\n\n[Attached File: ${file.name}]\n\`\`\`${file.type || 'text'}\n${textContent}\n\`\`\``;
                      } catch (e) {
                          console.error("Failed to read file as text", e);
-                         // Fallback to inlineData if readAsText fails
                          const base64 = await fileToBase64(file);
                          fileData = { data: base64, mimeType: file.type };
                      }
                  } else {
-                     // Binary files (Images, PDFs) use inlineData
                      const base64 = await fileToBase64(file);
                      fileData = { data: base64, mimeType: file.type };
                  }
@@ -727,25 +645,16 @@ export const App: React.FC = () => {
              const response = await runSmartChat(text, history, systemInstruction, location, fileData);
              responseText = response.text || "I'm sorry, I couldn't generate a response.";
              
-             // Extract grounding metadata
              if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
                  sources = response.candidates[0].groundingMetadata.groundingChunks
-                    .map((chunk: any) => {
-                        if (chunk.web) return { uri: chunk.web.uri, title: chunk.web.title };
-                        return null;
-                    })
+                    .map((chunk: any) => chunk.web ? { uri: chunk.web.uri, title: chunk.web.title } : null)
                     .filter((s: any) => s !== null) as Source[];
              }
         }
 
         setMessages((prev) => [
             ...prev,
-            {
-                id: Date.now() + 1,
-                role: Role.MODEL,
-                text: responseText,
-                sources: sources
-            },
+            { id: Date.now() + 1, role: Role.MODEL, text: responseText, sources: sources },
         ]);
 
     } catch (error: any) {
@@ -754,13 +663,7 @@ export const App: React.FC = () => {
         const needsKey = errorMessage.includes("API key") || errorMessage.includes("404");
         setMessages((prev) => [
             ...prev,
-            {
-                id: Date.now() + 1,
-                role: Role.MODEL,
-                text: `Error: ${errorMessage}`,
-                needsApiKey: needsKey,
-                isError: true
-            },
+            { id: Date.now() + 1, role: Role.MODEL, text: errorMessage, needsApiKey: needsKey, isError: true },
         ]);
     } finally {
         setIsLoading(false);
@@ -769,11 +672,8 @@ export const App: React.FC = () => {
 
   const pollVideoStatus = async (messageId: number, operation: Operation) => {
         videoOperations.current[messageId] = operation;
-        
         const checkStatus = async () => {
-            // Check if operations ref still tracks this ID (means it hasn't been cancelled/completed)
             if (!videoOperations.current[messageId]) return;
-
             try {
                 const updatedOp = await getVideoOperation(operation);
                 if (updatedOp.done) {
@@ -782,19 +682,17 @@ export const App: React.FC = () => {
                      } else {
                          const videoUri = updatedOp.response?.generatedVideos?.[0]?.video?.uri;
                          if (videoUri) {
-                             // Append API key to fetch the video
                              const videoUrl = `${videoUri}&key=${process.env.API_KEY}`;
                              setMessages(prev => prev.map(m => m.id === messageId ? { ...m, videoState: 'done', videoUrl: videoUrl, text: 'Here is your video!' } : m));
                          }
                      }
                      delete videoOperations.current[messageId];
                 } else {
-                    // Use a slightly longer polling interval to avoid rate limits
                     setTimeout(checkStatus, 8000);
                 }
             } catch (e) {
                 console.error("Video polling error", e);
-                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, videoState: 'error', text: "Failed to check video status. The request might have timed out.", isError: true } : m));
+                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, videoState: 'error', text: "Failed to check video status.", isError: true } : m));
                 delete videoOperations.current[messageId];
             }
         };
@@ -806,20 +704,16 @@ export const App: React.FC = () => {
       if (!message) return;
 
       if (message.isPlayingAudio) {
-          // Stop functionality would require keeping track of the audio object
-          // For simplicity, we toggle state
           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isPlayingAudio: false } : m));
           return;
       }
 
       if (message.audioData) {
-          // Play existing
           const audio = new Audio(`data:audio/mp3;base64,${message.audioData}`);
           audio.onended = () => setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isPlayingAudio: false } : m));
           audio.play();
           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isPlayingAudio: true } : m));
       } else {
-          // Generate new
           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isGeneratingAudio: true } : m));
           try {
               const audioBase64 = await generateSpeech(message.text, currentPersona.voiceName || appSettings.defaultVoice);
@@ -836,11 +730,9 @@ export const App: React.FC = () => {
   };
 
   const handleSelectApiKey = async () => {
-      // Cast window to any to avoid type conflict with existing definition
       const win = window as any;
       if (win.aistudio && win.aistudio.openSelectKey) {
           await win.aistudio.openSelectKey();
-          // Assuming the key is set in the environment or handled by the GoogleGenAI library implicitly after selection
       } else {
           alert("API Key selection dialog is not available.");
       }
@@ -851,8 +743,8 @@ export const App: React.FC = () => {
       switch (viewMode) {
           case 'chat':
               return (
-                  <div className="flex flex-col h-full relative">
-                      <div className="flex-1 overflow-y-auto p-4 scroll-smooth pb-20">
+                  <div className="flex flex-col h-full">
+                      <div className="flex-1 overflow-y-auto p-4 scroll-smooth custom-scrollbar">
                           {messages.map((msg) => (
                               <ChatBubble 
                                   key={msg.id} 
@@ -863,8 +755,9 @@ export const App: React.FC = () => {
                               />
                           ))}
                           {isLoading && <LoadingBubble />}
+                          <div ref={messagesEndRef} className="h-2" />
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gray-900/95 backdrop-blur supports-[backdrop-filter]:bg-gray-900/60">
+                      <div className="flex-shrink-0 z-10 bg-gray-900 border-t border-gray-700">
                           <MessageInput 
                               onSendMessage={handleSendMessage} 
                               isLoading={isLoading} 
@@ -1016,7 +909,7 @@ export const App: React.FC = () => {
                     />
                 );
             case 'robotics':
-                return <RoboticsView customPersonas={customPersonas} />;
+                return <RoboticsView />;
             case 'comic_creator':
                 return <MultiverseComicView customPersonas={customPersonas} />;
             case 'agent': // Re-purposing 'agent' route for the new Automation Studio
@@ -1042,16 +935,13 @@ export const App: React.FC = () => {
               
               const videoEl = document.createElement('video');
               videoEl.srcObject = stream;
-              videoEl.muted = true; // Important: video input to canvas doesn't need audio output
+              videoEl.muted = true;
               videoEl.play();
               
               const canvas = document.createElement('canvas');
               const ctx = canvas.getContext('2d');
               
-              // Audio Handling
               audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-              
-              // Ensure audio context is resumed (browsers often suspend it)
               if (audioContext.state === 'suspended') {
                   await audioContext.resume();
               }
@@ -1060,22 +950,18 @@ export const App: React.FC = () => {
               const processor = audioContext.createScriptProcessor(4096, 1, 1);
               
               source.connect(processor);
-              processor.connect(audioContext.destination); // keep local audio output muted or routed appropriately
+              processor.connect(audioContext.destination);
 
-              // Connect to Gemini Live
               const sessionPromise = ai.live.connect({
                   model: 'gemini-2.5-flash-native-audio-preview-09-2025',
                   callbacks: {
                       onopen: () => {
                           setVisionStatus('active');
-                          // Audio Streaming
                           processor.onaudioprocess = (e) => {
                               const inputData = e.inputBuffer.getChannelData(0);
                               const blob = createPcmBlob(inputData);
                               sessionPromise.then(s => s.sendRealtimeInput({ media: blob }));
                           };
-                          
-                          // Video Streaming (approx 2 FPS for balance)
                           setInterval(async () => {
                               if (ctx) {
                                 canvas.width = videoEl.videoWidth;
@@ -1086,7 +972,7 @@ export const App: React.FC = () => {
                                         const base64 = await blobToBase64(blob);
                                         sessionPromise.then(s => s.sendRealtimeInput({ media: { data: base64, mimeType: 'image/jpeg' } }));
                                     }
-                                }, 'image/jpeg', 0.6); // Reduced quality slightly for speed
+                                }, 'image/jpeg', 0.6);
                               }
                           }, 500);
                       },
@@ -1095,8 +981,6 @@ export const App: React.FC = () => {
                               const text = msg.serverContent.modelTurn.parts[0].text;
                               setVisionTranscript(prev => [...prev, { role: 'model', text }]);
                           }
-                          // Audio Output handling is complex and omitted here for brevity, relies on Gemini Live default behavior or specific PCM decoding if implemented fully.
-                          // For now, we focus on the visual connection stability.
                       },
                       onclose: () => {
                           if (visionStatus !== 'idle') setVisionStatus('idle');
@@ -1107,7 +991,7 @@ export const App: React.FC = () => {
                       },
                   },
                   config: {
-                      responseModalities: [Modality.AUDIO], // or [Modality.TEXT] if audio output is not needed/implemented
+                      responseModalities: [Modality.AUDIO],
                       systemInstruction: "You are a helpful vision assistant. Describe what you see and answer questions concisely.",
                   }
               });
@@ -1122,16 +1006,13 @@ export const App: React.FC = () => {
       }
       
       return () => {
-          if (session) {
-              // cleanup session if method exists
-          }
+          if (session) {}
           if (audioContext) {
               audioContext.close();
           }
       };
   }, [viewMode]);
 
-  // Render AuthView if not authenticated
   if (!authUser) {
       return (
           <ErrorBoundary>
@@ -1142,7 +1023,7 @@ export const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-        <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
+        <div className="flex h-[100dvh] bg-gray-900 text-white font-sans overflow-hidden">
         <Sidebar 
             isOpen={isSidebarOpen} 
             onClose={() => setIsSidebarOpen(false)} 
@@ -1172,7 +1053,7 @@ export const App: React.FC = () => {
             onLogout={handleLogout}
         />
         
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 h-full">
             <Header 
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
                 onToggleVisionMode={() => setViewMode(prev => prev === 'vision' ? 'chat' : 'vision')}
@@ -1195,7 +1076,7 @@ export const App: React.FC = () => {
                 isSummarizing={isSummarizing}
             />
             
-            <main className="flex-1 relative overflow-hidden">
+            <main className="flex-1 relative overflow-hidden flex flex-col">
                 {renderView()}
             </main>
 

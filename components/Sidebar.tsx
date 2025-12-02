@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { CloseIcon, SparklesIcon, ImageIcon, SettingsIcon, BotIcon, PlusIcon, PencilIcon, TrashIcon, GitHubIcon, JournalIcon, AgentIcon, GlobeAltIcon, MapPinIcon, OmIcon, WrenchScrewdriverIcon, UserIcon, BriefcaseIcon, CpuChipIcon, BookOpenIcon, NewspaperIcon, ScaleIcon, MicrophoneIcon, ArrowRightOnRectangleIcon, FilmIcon, DownloadIcon } from './Icons';
+import { CloseIcon, SparklesIcon, ImageIcon, SettingsIcon, BotIcon, PlusIcon, PencilIcon, TrashIcon, GitHubIcon, JournalIcon, AgentIcon, GlobeAltIcon, MapPinIcon, OmIcon, WrenchScrewdriverIcon, UserIcon, BriefcaseIcon, CpuChipIcon, BookOpenIcon, NewspaperIcon, ScaleIcon, MicrophoneIcon, ArrowRightOnRectangleIcon, DownloadIcon } from './Icons';
 import { ChatMode, CustomPersona, ViewMode, PREDEFINED_PERSONAS, LEGENDARY_PERSONAS, AuthUser } from '../types';
 
 interface SidebarProps {
@@ -179,7 +180,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <SidebarSection title="Tools" isOpen={sections.tools} onToggle={() => toggleSection('tools')}>
                     <NavButton icon={<BriefcaseIcon className="w-5 h-5 text-blue-300" />} label="Strategic Advisory Hub" isActive={viewMode === 'business_hub'} onClick={() => setViewMode('business_hub')} />
                     <NavButton icon={<OmIcon className="w-5 h-5 text-amber-300" />} label="Predictive Analytics (Kundli)" isActive={viewMode === 'public_kundli'} onClick={() => setViewMode('public_kundli')} />
-                    <NavButton icon={<FilmIcon className="w-5 h-5 text-red-400" />} label="Video Creation Studio" isActive={viewMode === 'video_studio'} onClick={() => setViewMode('video_studio')} />
                     <NavButton icon={<BookOpenIcon className="w-5 h-5 text-purple-300" />} label="Multiverse Comics" isActive={viewMode === 'comic_creator'} onClick={() => setViewMode('comic_creator')} />
                     <NavButton icon={<AgentIcon className="w-5 h-5 text-green-300" />} label="Automation Studio" isActive={viewMode === 'agent'} onClick={() => setViewMode('agent')} />
                     <NavButton icon={<GlobeAltIcon className="w-5 h-5 text-indigo-300" />} label="Aura" isActive={viewMode === 'aura'} onClick={() => setViewMode('aura')} />
